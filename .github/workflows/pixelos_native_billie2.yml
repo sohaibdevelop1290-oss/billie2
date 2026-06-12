@@ -1,32 +1,41 @@
 name: Native PixelOS 14 Build for Nord N100 (billie2)
 
 on:
-  workflow_dispatch: # Allows you to manually start the build from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build_rom:
     runs-on: ubuntu-latest
 
     steps:
-      # STEP 1: Allocate maximum storage space on the virtual machine
-      # This action formats and mounts a clean volume, giving you ~100GB+ of workspace space.
-      # MUST run before checkout, otherwise your repository files get overwritten.
-      - name: Maximize Runner Build Space
-        uses: easimon/maximize-build-space@v10
-        with:
-          root-reserve-mb: 2048
-          swap-size-mb: 12288 # Allocates 12GB Swap to prevent Out-Of-Memory compilation loops
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-          remove-docker-images: 'true'
-
-      # STEP 2: Now safely checkout your repository config files
+      # STEP 1: Checkout your repository config files first
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # STEP 2: Custom aggressive disk clearing directly on the root partition
+      # This cleans out ~35GB-40GB of pre-installed bloatware while preserving root path writing stability
+      - name: Free Disk Space Safely
+        run: |
+          echo "=== Disk space before clearing ==="
+          df -h
+          
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          
+          # Setup a 12GB local swapfile directly in the workspace to safeguard compiler RAM usage
+          sudo fallocate -l 12G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          
+          echo "=== Disk space after clearing ==="
+          df -h
+
       # STEP 3: Install absolute required Linux packages for AOSP compilation
+      # Since we didn't alter the root mount points, apt-get will now run flawlessly
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -59,7 +68,7 @@ jobs:
           git config --global user.name "Your Name"
           git config --global user.email "your.email@example.com"
           
-          # Optimize git RAM windows to prevent "Cannot initialize work tree" prebuilt checkout errors
+          # Optimize git RAM windows to prevent prebuilt checkout crashes
           git config --global core.packedgitlimit 512m
           git config --global core.packedgitwindowsize 512m
           
@@ -72,7 +81,7 @@ jobs:
           # Inject your specific local configuration manifest dependencies tree
           git clone https://github.com/sounddrill31/crave_aosp_builder.git -b main .repo/local_manifests
           
-          # Dual-tier fallback sync method. If multi-threading hits a rate limit, -j1 cleans up the broken tools.
+          # Dual-tier fallback sync method
           ~/bin/repo sync -c -j4 --force-sync --no-tags --no-clone-bundle --fail-fast || \
           ~/bin/repo sync -c -j1 --force-sync --no-tags --no-clone-bundle
 
@@ -103,4 +112,3 @@ jobs:
         with:
           name: PixelOS_14_billie2_ROM
           path: ~/android/pixelos/out/target/product/billie2/*.zip
-          
