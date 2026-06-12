@@ -1,0 +1,116 @@
+name: Build PixelOS for OnePlus Nord N100
+
+on:
+  workflow_dispatch:  # Manual trigger from GitHub Actions tab
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+
+    steps:
+      # Free up disk space (very important!)
+      - name: Free Disk Space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo apt-get clean
+          df -h
+
+      # Install required packages
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            bc bison build-essential ccache curl flex \
+            g++-multilib gcc-multilib git gnupg gperf \
+            imagemagick lib32ncurses5-dev lib32readline-dev \
+            lib32z1-dev liblz4-tool libncurses5 libncurses5-dev \
+            libsdl1.2-dev libssl-dev libwxgtk3.0-gtk3-dev \
+            libxml2 libxml2-utils lzop pngcrush rsync \
+            schedtool squashfs-tools xsltproc zip zlib1g-dev \
+            python3 python-is-python3 openjdk-11-jdk
+
+      # Setup repo tool
+      - name: Setup Repo Tool
+        run: |
+          mkdir -p ~/.bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+          chmod a+x ~/.bin/repo
+          echo "$HOME/.bin" >> $GITHUB_PATH
+
+      # Configure git
+      - name: Configure Git
+        run: |
+          git config --global user.email "build@github.com"
+          git config --global user.name "GitHub Actions"
+
+      # Setup ccache to speed up future builds
+      - name: Setup ccache
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ccache-pixelos-billie-${{ github.sha }}
+          restore-keys: ccache-pixelos-billie-
+
+      - name: Configure ccache
+        run: |
+          ccache -M 5G
+          echo "USE_CCACHE=1" >> $GITHUB_ENV
+          echo "CCACHE_EXEC=$(which ccache)" >> $GITHUB_ENV
+
+      # Sync PixelOS source
+      - name: Sync PixelOS Source
+        run: |
+          mkdir -p ~/pixelos
+          cd ~/pixelos
+          repo init -u https://github.com/PixelOS-AOSP/manifest.git -b fourteen --depth=1
+          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+
+      # Clone device trees for OnePlus Nord N100 (billie)
+      - name: Clone Device Trees
+        run: |
+          cd ~/pixelos
+
+          # Device tree
+          git clone https://github.com/LineageOS/android_device_oneplus_billie \
+            device/oneplus/billie --depth=1
+
+          # Kernel
+          git clone https://github.com/LineageOS/android_kernel_oneplus_sm4250 \
+            kernel/oneplus/sm4250 --depth=1
+
+          # Vendor blobs
+          git clone https://github.com/TheMuppets/proprietary_vendor_oneplus_billie \
+            vendor/oneplus/billie --depth=1
+
+          # Common oneplus sm4250
+          git clone https://github.com/LineageOS/android_device_oneplus_sm4250-common \
+            device/oneplus/sm4250-common --depth=1
+
+      # Build PixelOS
+      - name: Build PixelOS
+        run: |
+          cd ~/pixelos
+          source build/envsetup.sh
+          breakfast billie
+          mka bacon -j$(nproc --all) 2>&1 | tee build.log
+
+      # Upload the ROM zip
+      - name: Upload ROM
+        uses: actions/upload-artifact@v3
+        with:
+          name: PixelOS-billie
+          path: ~/pixelos/out/target/product/billie/PixelOS*.zip
+          retention-days: 7
+
+      # Upload build log in case of failure
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-log
+          path: ~/pixelos/build.log
+          retention-days: 3
