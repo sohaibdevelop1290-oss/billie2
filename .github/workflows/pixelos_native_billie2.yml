@@ -1,41 +1,37 @@
 name: Native PixelOS 14 Build for Nord N100 (billie2)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
 
 jobs:
   build_rom:
     runs-on: ubuntu-latest
 
     steps:
-      # STEP 1: Checkout your repository config files first
+      # STEP 1: Always checkout repository configurations first
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # STEP 2: Custom aggressive disk clearing directly on the root partition
-      # This cleans out ~35GB-40GB of pre-installed bloatware while preserving root path writing stability
+      # STEP 2: Pure Storage Reclamation (No fallocate, No swap modifications)
+      # This cleans up ~35GB-40GB of pre-installed bloat safely without breaking mount loops.
       - name: Free Disk Space Safely
         run: |
           echo "=== Disk space before clearing ==="
           df -h
           
+          echo "Purging heavy runtime environments..."
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo docker image prune --all --force
           
-          # Setup a 12GB local swapfile directly in the workspace to safeguard compiler RAM usage
-          sudo fallocate -l 12G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
+          echo "Pruning unused Docker cache images..."
+          sudo docker image prune --all --force
           
           echo "=== Disk space after clearing ==="
           df -h
 
-      # STEP 3: Install absolute required Linux packages for AOSP compilation
-      # Since we didn't alter the root mount points, apt-get will now run flawlessly
+      # STEP 3: Install Core Linux packages required for Android Compilation
       - name: Install Build Dependencies
         run: |
           sudo apt-get update
@@ -44,7 +40,7 @@ jobs:
             libelf-dev liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzma \
             pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3-pip
 
-      # STEP 4: Install Google Repo Tool binary
+      # STEP 4: Fetch Google Repo Binary tool
       - name: Set up Google Repo Tool
         run: |
           mkdir -p ~/bin
@@ -52,7 +48,7 @@ jobs:
           chmod a+x ~/bin/repo
           echo "$HOME/bin" >> $GITHUB_PATH
 
-      # STEP 5: Re-link previous run compilation progress
+      # STEP 5: Re-link incremental compilation milestone cache blocks
       - name: Handle Compiler Cache (ccache)
         uses: actions/cache@v4
         with:
@@ -62,50 +58,50 @@ jobs:
             ccache-pixelos14-billie2-${{ github.ref_name }}-
             ccache-pixelos14-billie2-
 
-      # STEP 6: Shallow-initialize and sync PixelOS Android 14 source files safely
+      # STEP 6: Shallow-cloned checkout of PixelOS Android 14 Core Sources
       - name: Initialize & Sync Source Code
         run: |
           git config --global user.name "Your Name"
           git config --global user.email "your.email@example.com"
           
-          # Optimize git RAM windows to prevent prebuilt checkout crashes
+          # Force Git optimization limits to shield prebuilt nested checkouts from crashing
           git config --global core.packedgitlimit 512m
           git config --global core.packedgitwindowsize 512m
           
           mkdir -p ~/android/pixelos
           cd ~/android/pixelos
           
-          # Initialize PixelOS Android 14 core manifest tree
+          # Initialize Android 14 (Fourteen) Manifest Source Target Tree
           ~/bin/repo init -u https://github.com/PixelOS-Fourteen/manifest.git -b fourteen-qpr1 --git-lfs --depth=1
           
           # Inject your specific local configuration manifest dependencies tree
           git clone https://github.com/sounddrill31/crave_aosp_builder.git -b main .repo/local_manifests
           
-          # Dual-tier fallback sync method
+          # Double-pass sync pipeline to safely capture toolchain packages without stalling
           ~/bin/repo sync -c -j4 --force-sync --no-tags --no-clone-bundle --fail-fast || \
           ~/bin/repo sync -c -j1 --force-sync --no-tags --no-clone-bundle
 
-      # STEP 7: Run compilation tasks
+      # STEP 7: Fire Up the Android Compilation Engine
       - name: Execute Compilation
         run: |
           cd ~/android/pixelos
           
-          # Hard lock compiler parameters to secure workspace boundaries
+          # Establish clear memory tracking boundaries for ccache
           export USE_CCACHE=1
           export CCACHE_DIR=~/.ccache
-          ccache -M 15G  # Safely compresses tracking data under 15 Gigabytes
-          ccache -z      # Refreshes internal statistics loops
+          ccache -M 15G  # Securely restricts tracking log sizes under 15 Gigabytes
+          ccache -z      # Refreshes internal statistics logs
           
-          # Source environment architecture commands
+          # Source compilation environmental variables
           source build/envsetup.sh
           
-          # Select target device tree profile configuration
+          # Initialize Nord N100 (billie2) build setup targets
           lunch pixelos_billie2-userdebug
           
-          # Run compilation using all available performance cores
+          # Compile the ROM image package using maximum active core paths
           mka bacon -j$(nproc --all)
 
-      # STEP 8: Push finished artifacts back to your actions panel if build finishes 100%
+      # STEP 8: Upload flashable package files if build crosses 100% threshold
       - name: Upload Finished Build Artifacts
         if: success()
         uses: actions/upload-artifact@v4
