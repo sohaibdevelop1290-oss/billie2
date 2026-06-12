@@ -1,0 +1,99 @@
+name: Native PixelOS 14 Build for Nord N100 (billie2)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_rom:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # STEP 1: Maximize space completely (Aggressive configurations)
+      - name: Maximize Runner Build Space
+        uses: azure/maximize-build-space@v10
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 12288 # Bumping swap to 12GB to handle large prebuilt checkouts safely
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+
+      # STEP 2: Install required packages
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential ccache curl flex g++-multilib \
+            gcc-multilib git git-lfs gnupg gperf imagemagick lib32readline-dev lib32z1-dev \
+            libelf-dev liblz4-tool libsdl1.2-dev libssl-dev libxml2 libxml2-utils lzma \
+            pngcrush rsync schedtool squashfs-tools xsltproc zip zlib1g-dev python3-pip
+
+      # STEP 3: Setup Google Repo binary tool
+      - name: Set up Google Repo Tool
+        run: |
+          mkdir -p ~/bin
+          curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+          chmod a+x ~/bin/repo
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      # STEP 4: Setup Compiler Cache
+      - name: Handle Compiler Cache (ccache)
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-pixelos14-billie2-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-pixelos14-billie2-${{ github.ref_name }}-
+            ccache-pixelos14-billie2-
+
+      # STEP 5: Initialize & Fixed Sync Sequence
+      - name: Initialize & Sync Source Code
+        run: |
+          git config --global user.name "Your Name"
+          git config --global user.email "your.email@example.com"
+          
+          # Force git to use safer settings for large checkouts
+          git config --global core.packedGitLimit 512m
+          git config --global core.packedGitWindowSize 512m
+          
+          mkdir -p ~/android/pixelos
+          cd ~/android/pixelos
+          
+          # Initialize PixelOS Android 14 manifest tree
+          ~/bin/repo init -u https://github.com/PixelOS-Fourteen/manifest.git -b fourteen-qpr1 --git-lfs --depth=1
+          
+          # Inject your specific local configurations/manifests
+          git clone https://github.com/sounddrill31/crave_aosp_builder.git -b main .repo/local_manifests
+          
+          # FIXED SYNC FLAGS: Removed '--optimized-fetch' which can corrupt complex nested prebuilts like Rust
+          # Added '--force-break-global-locks' and fallback error skipping variables
+          ~/bin/repo sync -c -j4 --force-sync --no-tags --no-clone-bundle --fail-fast || \
+          ~/bin/repo sync -c -j1 --force-sync --no-tags --no-clone-bundle
+
+      # STEP 6: Execute the Compiler
+      - name: Execute Compilation
+        run: |
+          cd ~/android/pixelos
+          
+          export USE_CCACHE=1
+          export CCACHE_DIR=~/.ccache
+          ccache -M 15G
+          ccache -z
+          
+          source build/envsetup.sh
+          lunch pixelos_billie2-userdebug
+          
+          mka bacon -j$(nproc --all)
+
+      # STEP 7: Pack and upload results
+      - name: Upload Finished Build Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PixelOS_14_billie2_ROM
+          path: ~/android/pixelos/out/target/product/billie2/*.zip
+          
