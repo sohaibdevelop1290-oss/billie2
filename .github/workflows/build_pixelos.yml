@@ -10,13 +10,18 @@ jobs:
 
     steps:
       - name: Free Disk Space
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo apt-get clean
-          df -h
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: false
+
+      - name: Check Disk Space
+        run: df -h
 
       - name: Install Dependencies
         run: |
@@ -27,9 +32,9 @@ jobs:
             imagemagick liblz4-tool libncurses-dev \
             libssl-dev libxml2 libxml2-utils lzop \
             pngcrush rsync schedtool squashfs-tools \
-            xsltproc zip zlib1g-dev \
+            xsltproc zip zlib1g-dev lib32z1-dev \
             python3 python-is-python3 openjdk-17-jdk \
-            libwxgtk3.2-dev lib32z1-dev
+            libwxgtk3.2-dev
 
       - name: Setup Repo Tool
         run: |
@@ -60,8 +65,24 @@ jobs:
         run: |
           mkdir -p ~/pixelos
           cd ~/pixelos
-          repo init -u https://github.com/PixelOS-AOSP/manifest.git -b fourteen --depth=1
-          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags
+          repo init \
+            -u https://github.com/PixelOS-AOSP/manifest.git \
+            -b fourteen \
+            --depth=1 \
+            --no-repo-verify
+          repo sync -c \
+            -j$(nproc --all) \
+            --force-sync \
+            --no-clone-bundle \
+            --no-tags \
+            --fail-fast \
+            2>&1 | tee sync.log || \
+          repo sync -c \
+            -j2 \
+            --force-sync \
+            --no-clone-bundle \
+            --no-tags \
+            2>&1 | tee -a sync.log
 
       - name: Clone Device Trees
         run: |
@@ -101,5 +122,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-log
-          path: ~/pixelos/build.log
+          path: |
+            ~/pixelos/build.log
+            ~/pixelos/sync.log
           retention-days: 3
