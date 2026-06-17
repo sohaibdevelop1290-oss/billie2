@@ -50,11 +50,6 @@ jobs:
           echo "USE_CCACHE=1" >> $GITHUB_ENV
           echo "CCACHE_EXEC=$(which ccache)" >> $GITHUB_ENV
 
-      - name: Create local manifest
-        run: |
-          mkdir -p ~/lineage/.repo/local_manifests
-          echo '<?xml version="1.0" encoding="UTF-8"?><manifest><remove-project name="platform/prebuilts/clang/host/linux-x86" /></manifest>' > ~/lineage/.repo/local_manifests/remove_projects.xml
-
       - name: Sync LineageOS Source
         run: |
           mkdir -p ~/lineage
@@ -62,13 +57,53 @@ jobs:
           repo init -u https://github.com/LineageOS/android.git -b lineage-22.1 --depth=1 --no-repo-verify
           repo sync -c -j4 --force-sync --no-clone-bundle --no-tags 2>&1 | tee sync.log || repo sync -c -j2 --force-sync --no-clone-bundle --no-tags 2>&1 | tee -a sync.log
 
-      - name: Clone Device Trees
+      - name: Clone Device and Kernel
         run: |
           cd ~/lineage
           git clone https://github.com/sohaibdevelop1290-oss/android_device_oneplus_billie2.git device/oneplus/billie2 --depth=1 -b lineage-22.1
           git clone https://github.com/sohaibdevelop1290-oss/android_kernel_oneplus_sm4250.git kernel/oneplus/sm4250 --depth=1 -b lineage-22.1
+
+      - name: Clone Vendor
+        run: |
+          cd ~/lineage
           git clone https://github.com/sohaibdevelop1290-oss/proprietary_vendor_oneplus_billie2.git vendor/oneplus/billie2 --depth=1 -b lineage-22.1
+          git clone https://github.com/LineageOS/android_vendor_lineage.git vendor/lineage --depth=1 -b lineage-22.1
+
+      - name: Clone QCOM Hardware HAL
+        run: |
+          cd ~/lineage
+          git clone https://github.com/sohaibdevelop1290-oss/android_device_qcom_sepolicy_vndr.git device/qcom/sepolicy_vndr --depth=1 -b lineage-22.1-legacy-um
           git clone https://github.com/LineageOS/android_hardware_oneplus.git hardware/oneplus --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_hardware_qcom-caf_common.git hardware/qcom-caf/common --depth=1 -b lineage-22.1
+          git clone https://github.com/LineageOS/android_hardware_qcom_bootctrl.git hardware/qcom-caf/bootctrl --depth=1 -b lineage-22.1-caf
+          git clone https://github.com/sohaibdevelop1290-oss/android_hardware_qcom_display.git hardware/qcom-caf/sm8250/display --depth=1 -b lineage-22.1-caf-sm8250
+          git clone https://github.com/sohaibdevelop1290-oss/android_hardware_qcom_audio.git hardware/qcom-caf/sm8250/audio --depth=1 -b lineage-22.1-caf-sm8250
+          git clone https://github.com/LineageOS/android_hardware_qcom_media.git hardware/qcom-caf/sm8250/media --depth=1 -b lineage-22.1-caf-sm8250
+          git clone https://github.com/LineageOS/android_hardware_qcom_wlan.git hardware/qcom-caf/wlan --depth=1 -b lineage-22.1-caf
+          git clone https://github.com/sohaibdevelop1290-oss/android_hardware_interfaces.git hardware/interfaces --depth=1 -b lineage-22.1
+
+      - name: Clone Google Hardware
+        run: |
+          cd ~/lineage
+          git clone https://android.googlesource.com/platform/hardware/interfaces.git hardware/google/interfaces --depth=1 -b android15-release
+          git clone https://github.com/LineageOS/android_hardware_google_pixel.git hardware/google/pixel --depth=1 -b lineage-22.1
+
+      - name: Clone QCOM Opensource Vendor
+        run: |
+          cd ~/lineage
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_usb.git vendor/qcom/opensource/usb --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_vibrator.git vendor/qcom/opensource/vibrator --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_dataservices.git vendor/qcom/opensource/dataservices --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_display.git vendor/qcom/opensource/display --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_display-commonsys.git vendor/qcom/opensource/commonsys/display --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_vendor_qcom_opensource_display-commonsys-intf.git vendor/qcom/opensource/commonsys-intf/display --depth=1 -b lineage-22.1
+
+      - name: Clone Frameworks and Build
+        run: |
+          cd ~/lineage
+          git clone https://github.com/sohaibdevelop1290-oss/android_frameworks_native.git frameworks/native --depth=1 -b lineage-22.1
+          git clone https://github.com/sohaibdevelop1290-oss/android_frameworks_av.git frameworks/av --depth=1 -b lineage-22.1
+          git clone https://android.googlesource.com/platform/build.git build/make --depth=1 -b android15-release
 
       - name: Build LineageOS
         run: |
