@@ -20,9 +20,6 @@ jobs:
           docker-images: true
           swap-storage: false
 
-      - name: Check Disk Space
-        run: df -h
-
       - name: Install Dependencies
         run: |
           sudo apt-get update
@@ -53,12 +50,17 @@ jobs:
           echo "USE_CCACHE=1" >> $GITHUB_ENV
           echo "CCACHE_EXEC=$(which ccache)" >> $GITHUB_ENV
 
+      - name: Create local manifest
+        run: |
+          mkdir -p ~/lineage/.repo/local_manifests
+          echo '<?xml version="1.0" encoding="UTF-8"?><manifest><remove-project name="platform/prebuilts/clang/host/linux-x86" /></manifest>' > ~/lineage/.repo/local_manifests/remove_projects.xml
+
       - name: Sync LineageOS Source
         run: |
           mkdir -p ~/lineage
           cd ~/lineage
           repo init -u https://github.com/LineageOS/android.git -b lineage-22.1 --depth=1 --no-repo-verify
-          repo sync -c -j$(nproc --all) --force-sync --no-clone-bundle --no-tags 2>&1 | tee sync.log || repo sync -c -j2 --force-sync --no-clone-bundle --no-tags 2>&1 | tee -a sync.log
+          repo sync -c -j4 --force-sync --no-clone-bundle --no-tags 2>&1 | tee sync.log || repo sync -c -j2 --force-sync --no-clone-bundle --no-tags 2>&1 | tee -a sync.log
 
       - name: Clone Device Trees
         run: |
@@ -78,9 +80,7 @@ jobs:
       - name: List Output Files
         if: always()
         run: |
-          echo "=== Output directory ==="
           ls -la ~/lineage/out/target/product/billie2/ || echo "Directory not found"
-          echo "=== ZIP files ==="
           find ~/lineage/out/target/product/billie2/ -name "*.zip" 2>/dev/null || echo "No ZIP found"
 
       - name: Upload ROM
