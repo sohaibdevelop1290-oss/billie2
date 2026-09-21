@@ -1,0 +1,56 @@
+name: Build postmarketOS Images (Official Kernel)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python & Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y python3-pip python3-setuptools build-essential bc bison flex libssl-dev libncurses-dev libelf-dev clang lld gcc-aarch64-linux-gnu device-tree-compiler git
+          pip3 install --user pmbootstrap
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify pmbootstrap Installation
+        run: |
+          pmbootstrap --version
+
+      - name: Initialize pmbootstrap (Official Repo Setup)
+        run: |
+          pmbootstrap init --non-interactive \
+            --channel edge \
+            --vendor oneplus \
+            --device billie2 \
+            --ui phosh
+
+      - name: Build Official Kernel & RootFS Images
+        run: |
+          # Official kernel build automatically handled by pmbootstrap
+          pmbootstrap install --no-fshack
+
+      - name: Export Output Images
+        run: |
+          pmbootstrap export
+
+      - name: Prepare Artifacts for Upload
+        run: |
+          mkdir -p output_images
+          cp /tmp/postmarketOS-export/boot.img-oneplus-billie2 output_images/boot.img
+          cp /tmp/postmarketOS-export/oneplus-billie2.img output_images/rootfs.img
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: postmarketOS-billie2-images
+          path: output_images/
+          
