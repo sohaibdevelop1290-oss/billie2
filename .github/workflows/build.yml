@@ -27,10 +27,15 @@ jobs:
         run: |
           pmbootstrap --version
 
-      - name: Initialize pmbootstrap Configuration
+      - name: Initialize & Configure pmbootstrap Settings
         run: |
-          # echo -e के ज़रिए डिफ़ॉल्ट प्रोम्प्स के लिए एंटर (newline) पास किया गया है
-          echo -e "edge\noneplus\nbillie2\nphosh\n" | pmbootstrap init
+          # 1. Initialize with defaults using yes command
+          yes "" | pmbootstrap init || true
+
+          # 2. Set target vendor, device, channel and UI explicitly
+          pmbootstrap config vendor oneplus
+          pmbootstrap config device billie2
+          pmbootstrap config ui phosh
 
       - name: Build Official Kernel & RootFS Images
         run: |
