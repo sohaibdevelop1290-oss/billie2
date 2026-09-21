@@ -14,11 +14,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Dependencies & pmbootstrap via Git
+      - name: Set up Dependencies & pmbootstrap via New Git Repository
         run: |
           sudo apt update
           sudo apt install -y python3-pip python3-setuptools build-essential bc bison flex libssl-dev libncurses-dev libelf-dev clang lld gcc-aarch64-linux-gnu device-tree-compiler git
-          git clone https://gitlab.com/postmarketOS/pmbootstrap.git
+          git clone https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           cd pmbootstrap
           pip install .
           echo "$HOME/.local/bin" >> $GITHUB_PATH
