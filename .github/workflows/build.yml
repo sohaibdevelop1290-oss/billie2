@@ -27,13 +27,12 @@ jobs:
         run: |
           pmbootstrap --version
 
-      - name: Initialize pmbootstrap (Official Repo Setup)
+      - name: Configure pmbootstrap Device & Channel
         run: |
-          pmbootstrap init --non-interactive \
-            --channel edge \
-            --vendor oneplus \
-            --device billie2 \
-            --ui phosh
+          pmbootstrap config channel edge
+          pmbootstrap config vendor oneplus
+          pmbootstrap config device billie2
+          pmbootstrap config ui phosh
 
       - name: Build Official Kernel & RootFS Images
         run: |
