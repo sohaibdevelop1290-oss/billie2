@@ -14,12 +14,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python & Dependencies
+      - name: Set up Dependencies & pmbootstrap via Git
         run: |
           sudo apt update
           sudo apt install -y python3-pip python3-setuptools build-essential bc bison flex libssl-dev libncurses-dev libelf-dev clang lld gcc-aarch64-linux-gnu device-tree-compiler git
-          pip3 install --user pmbootstrap
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          git clone https://gitlab.com/postmarketOS/pmbootstrap.git
+          cd pmbootstrap
+          sudo python3 setup.py install
 
       - name: Verify pmbootstrap Installation
         run: |
@@ -35,7 +36,6 @@ jobs:
 
       - name: Build Official Kernel & RootFS Images
         run: |
-          # Official kernel build automatically handled by pmbootstrap
           pmbootstrap install --no-fshack
 
       - name: Export Output Images
@@ -51,6 +51,6 @@ jobs:
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: postmarketOS-billie2-images
+          name: postmarketOS-billie2-official-images
           path: output_images/
           
